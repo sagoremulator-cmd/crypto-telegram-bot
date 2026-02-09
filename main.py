@@ -6,7 +6,6 @@ from telethon import TelegramClient
 from dotenv import load_dotenv
 from flask import Flask
 
-# Load environment variables
 load_dotenv()
 app = Flask('')
 
@@ -18,17 +17,15 @@ COINGECKO_API = os.getenv("COINGECKO_API")
 
 client = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-posted_news = set()
+posted_news = []
+MAX_NEWS = 50
 posted_prices = {}
 
-# Crypto news feeds
 NEWS_FEEDS = [
     "https://cointelegraph.com/rss",
-    "https://cryptoslate.com/feed/",
-    "https://www.coindesk.com/arc/outboundfeeds/rss/"
+    "https://cryptoslate.com/feed/"
 ]
 
-# Parse RSS feed
 def parse_feed(url):
     try:
         feed = feedparser.parse(url)
@@ -36,7 +33,6 @@ def parse_feed(url):
     except:
         return []
 
-# Fetch top 10 coins from CoinGecko
 def fetch_prices():
     try:
         resp = requests.get(COINGECKO_API).json()
@@ -47,18 +43,19 @@ def fetch_prices():
     except:
         return {}
 
-# Main bot loop
 async def main_loop():
-    global posted_prices
+    global posted_prices, posted_news
     while True:
-        # 1. Post News
+        # Post News
         for feed_url in NEWS_FEEDS:
             entries = parse_feed(feed_url)
             for entry in entries:
                 link = entry.link
                 title = entry.title
                 if link not in posted_news:
-                    posted_news.add(link)
+                    posted_news.append(link)
+                    if len(posted_news) > MAX_NEWS:
+                        posted_news.pop(0)
                     message = f"📰 *Crypto News*\n\n*{title}*\n{link}"
                     try:
                         await client.send_message(CHANNEL, message)
@@ -66,7 +63,7 @@ async def main_loop():
                     except:
                         pass
 
-        # 2. Post Price Alerts (if >5% change)
+        # Post Price Alerts
         prices = fetch_prices()
         for coin, price in prices.items():
             old_price = posted_prices.get(coin)
@@ -81,9 +78,8 @@ async def main_loop():
                         pass
             posted_prices[coin] = price
 
-        await asyncio.sleep(600)  # wait 10 mins
+        await asyncio.sleep(600)  # 10 mins
 
-# Flask server to keep bot alive
 @app.route('/')
 def home():
     return "Bot is alive!"
