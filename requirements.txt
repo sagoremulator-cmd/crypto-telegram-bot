@@ -1,0 +1,5 @@
+telethon
+requests
+feedparser
+python-dotenv
+flask
